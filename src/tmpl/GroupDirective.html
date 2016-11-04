@@ -1,10 +1,12 @@
 <div class="elastic-builder-group">
-  <h5>If
+  <h5>
     <select data-ng-model="group.subType" class="form-control">
-      <option value="and">all</option>
-      <option value="or">any</option>
+      <!-- <option value="and">all</option>
+      <option value="or">any</option> -->
+      <option value="must">must</option>
+      <option value="should">should</option>
     </select>
-    of these conditions are met
+    Match these conditions
   </h5>
   <div
     data-ng-repeat="rule in group.rules"

@@ -26,6 +26,7 @@
             var data = scope.data;
 
             scope.filters = [];
+            if(data.filters) scope.filters = data.filters;
 
             /**
              * Removes either Group or Rule
@@ -47,7 +48,7 @@
             scope.addGroup = function() {
               scope.filters.push({
                 type: 'group',
-                subType: 'and',
+                subType: 'must',
                 rules: [],
               });
             };
@@ -58,8 +59,8 @@
              */
             scope.$watch('data.needsUpdate', function(curr) {
               if (!curr) return;
-
               scope.filters = elasticQueryService.toFilters(data.query, scope.data.fields);
+
               scope.data.needsUpdate = false;
             });
 
@@ -69,7 +70,16 @@
             scope.$watch('filters', function(curr) {
               if (!curr) return;
 
-              data.query = elasticQueryService.toQuery(scope.filters, scope.data.fields);
+              var obj = {};
+              var query = elasticQueryService.toQuery(scope.filters, scope.data.fields);
+
+             query.forEach(function(bool){
+                Object.keys(bool).forEach(function(key){
+                  obj[key] = bool[key];
+                });
+              });
+
+              data.query = obj;
             }, true);
           },
         };

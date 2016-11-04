@@ -28,9 +28,9 @@
 
             if (!fields || !field) return;
 
-            if (fields[field].subType === 'boolean') return 'boolean';
+            if (field.subType === 'boolean') return 'boolean';
 
-            return fields[field].type;
+            return field.type;
           };
         },
       };

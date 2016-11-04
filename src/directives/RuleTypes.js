@@ -41,11 +41,20 @@
             var needs = [
               'equals',
               'notEquals',
-
+              'match_phrase',
               'gt',
               'gte',
               'lt',
               'lte',
+            ];
+
+            return ~needs.indexOf(scope.rule.subType);
+          };
+
+          scope.inputPercentNeeded = function() {
+            var needs = [
+              'match',
+              'notMatch',
             ];
 
             return ~needs.indexOf(scope.rule.subType);

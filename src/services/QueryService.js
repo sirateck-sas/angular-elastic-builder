@@ -25,7 +25,17 @@
     ]);
 
   function toFilters(query, fieldMap){
-    var filters = query.map(parseQueryGroup.bind(query, fieldMap));
+    var q = [];
+
+    Object.keys(query).forEach(function(key){
+      var o = {};
+      o[key] =  query[key];
+      q.push(o);
+    });
+
+    var filters = q.map(parseQueryGroup.bind(q, fieldMap)).filter(function(item){
+      return !!item;
+    });
     return filters;
   }
 
@@ -33,6 +43,7 @@
     var query = filters.map(parseFilterGroup.bind(filters, fieldMap, $filter)).filter(function(item) {
       return !!item;
     });
+
     return query;
   }
 
@@ -43,6 +54,8 @@
       , typeMap = {
         or: 'group',
         and: 'group',
+        must: 'group',
+        should: 'group',
         range: 'number',
       }
       , type = typeMap[key] || 'item'
@@ -51,6 +64,8 @@
     switch (key) {
       case 'or':
       case 'and':
+      case 'should':
+      case 'must':
         obj.rules = group[key].map(parseQueryGroup.bind(group, fieldMap));
         obj.subType = key;
         break;
@@ -62,6 +77,27 @@
           missing: 'notExists',
         }[key];
         delete obj.value;
+        break;
+      case 'match':
+      case 'match_phrase':
+          var fieldName = Object.keys(group[key])[0]
+
+          var fieldData = fieldMap.filter(function(f){
+            return f.name == fieldName;
+          });
+
+          if(!fieldData.length) {console.log("No fieldData",fieldMap);return {};}
+          obj.field = fieldData[0];
+
+         if(key != 'match'){
+              obj.value = group[key][fieldName].slop;
+          }
+          else{
+            obj.matchingPercent = parseInt(group[key][fieldName].minimum_should_match.slice(0, -1));
+          }
+
+          obj.subType = key;
+
         break;
       case 'term':
       case 'terms':
@@ -135,16 +171,29 @@
   function parseFilterGroup(fieldMap, $filter, group) {
     var obj = {};
     if (group.type === 'group') {
-      obj[group.subType] = group.rules.map(parseFilterGroup.bind(group, fieldMap, $filter)).filter(function(item) {
-        return !!item;
-      });
+      if(group.subType != 'should' && group.subType != 'must'){
+         obj = {filter:{}};
+        obj.filter[group.subType] = group.rules.map(parseFilterGroup.bind(group, fieldMap, $filter)).filter(function(item) {
+          return !!item;
+        });
+      }
+      else{
+        obj[group.subType] = group.rules.map(parseFilterGroup.bind(group, fieldMap, $filter)).filter(function(item) {
+          return !!item;
+        });
+      }
+
       return obj;
     }
 
-    var fieldName = group.field;
-    var fieldData = fieldMap[fieldName];
+    var field = group.field;
+    var fieldData = fieldMap.find(function(elmt){
+      return angular.equals(elmt,field);
+    });
 
+    if(!fieldData) return;
 
+    var fieldName = fieldData.name
     if (!fieldName) return;
 
     switch (fieldData.type) {
@@ -168,7 +217,35 @@
             obj.exists = { field: fieldName };
             break;
           case 'notExists':
+            if (group.value === undefined) return;
             obj.missing = { field: fieldName };
+            break;
+          case 'match':
+
+            if (group.matchingPercent === undefined) return;
+            obj = { match:{}};
+            obj.match[fieldName] = {}
+            obj.match[fieldName]['query'] = "%queryname%";
+
+            obj.match[fieldName]['minimum_should_match'] = group.matchingPercent + "%";
+            obj.match[fieldName]['operator'] = 'and';
+
+            break;
+          case "match_phrase":
+            if (group.value === undefined) return;
+            obj = { match_phrase:{}};
+            obj.match_phrase[fieldName] = {}
+            obj.match_phrase[fieldName]['query'] = "%queryname%";
+            obj.match_phrase[fieldName]['slop'] = group.value;
+
+            break;
+          case 'notMatch':
+            if (group.matchingPercent === undefined) return;
+            obj.not = { match:{}};
+            obj.not.match[fieldName] = {}
+            obj.not.match[fieldName]['query'] = "%queryname%";
+            obj.not.match[fieldName]['minimum_should_match'] = group.matchingPercent + "%";
+            obj.not.match[fieldName]['operator'] = 'and';
             break;
           default:
             throw new Error('unexpected subtype ' + group.subType);

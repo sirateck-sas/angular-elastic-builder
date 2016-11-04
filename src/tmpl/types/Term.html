@@ -1,16 +1,24 @@
 <span class="elastic-term">
   <select data-ng-model="rule.subType" class="form-control">
-    <!-- Term Options -->
-    <optgroup label="Text">
-      <option value="equals">Equals</option>
-      <option value="notEquals">! Equals</option>
+
+    <!-- Matching Options -->
+    <optgroup label="Matching">
+      <option value="match">Minimum Should Match (%)</option>
+      <option value="match_phrase">Match Phrase (slop)</option>
+      <!-- <option value="notMatch">! Match</option> -->
     </optgroup>
 
+    <!-- Term Options -->
+    <!-- <optgroup label="Text">
+      <option value="equals">Equals</option>
+      <option value="notEquals">! Equals</option>
+    </optgroup> -->
+
     <!-- Generic Options -->
-    <optgroup label="Generic">
+    <!-- <optgroup label="Generic">
       <option value="exists">Exists</option>
       <option value="notExists">! Exists</option>
-    </optgroup>
+    </optgroup> -->
 
   </select>
   <input
@@ -18,4 +26,10 @@
     class="form-control"
     data-ng-model="rule.value"
     type="text">
+
+    <input
+    data-ng-if="inputPercentNeeded()"
+    type="number" data-ng-model="rule.matchingPercent"
+    class="form-control" placeholder="Seuil de matching...">
+
 </span>
