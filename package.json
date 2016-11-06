@@ -10,7 +10,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/dncrews/angular-elastic-builder.git"
+    "url": "https://github.com/sirateck-sas/angular-elastic-builder.git"
   },
   "devDependencies": {
     "angular-recursion": "^1.0.5",
