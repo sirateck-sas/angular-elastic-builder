@@ -36,42 +36,103 @@
     var filters = q.map(parseQueryGroup.bind(q, fieldMap)).filter(function(item){
       return !!item;
     });
+
     return filters;
   }
-
+  // Construct a BOOL Query
+  // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-bool-query.html
   function toQuery(filters, fieldMap, $filter){
+
+    //If user create an existing group, we merge rules into unique group
+    /*var mergedFilters = {};
+    filters.forEach(function(filter){
+      console.log('filter',filter);
+      if(filter.type == 'group'){
+        if(!mergedFilters[filter.subType]){
+           mergedFilters[filter.subType] = filter;
+        }
+        else{
+          filter.rules.forEach(function(rule){
+              var exists = mergedFilters[filter.subType].rules.find(function(f){
+                  return angular.equals(f,rule);
+              });
+              if(!exists) mergedFilters[filter.subType].rules.push(rule);
+          });
+
+        }
+      }
+
+    });
+    console.log("merged filters",mergedFilters);
+    filters = Object.values(mergedFilters);
+    console.log("merged filters values",filters);*/
+
     var query = filters.map(parseFilterGroup.bind(filters, fieldMap, $filter)).filter(function(item) {
       return !!item;
     });
 
-    return query;
+    var obj = {};
+
+     query.forEach(function(q){
+        Object.keys(q).forEach(function(key){
+          obj[key] = q[key];
+        });
+      });
+
+    return obj;
+
   }
+
 
   function parseQueryGroup(fieldMap, group, truthy) {
     if (truthy !== false) truthy = true;
 
     var key = Object.keys(group)[0]
       , typeMap = {
-        or: 'group',
-        and: 'group',
+        bool: 'group',
         must: 'group',
         should: 'group',
+        must_not: 'group',
+        filter: 'group',
         range: 'number',
       }
       , type = typeMap[key] || 'item'
       , obj = getFilterTemplate(type);
 
     switch (key) {
-      case 'or':
-      case 'and':
+      case 'bool':
+          //Transform fo array
+          var rules = [];
+
+          Object.keys(group[key]).forEach(function(subkey){
+            var o = {};
+            o[subkey] =  group[key][subkey];
+            rules.push(o);
+          });
+
+          obj.rules = rules.map(parseQueryGroup.bind(group, fieldMap));
+          obj.subType = key;
+        break;
       case 'should':
       case 'must':
+      case 'must_not':
+      case 'filter':
         obj.rules = group[key].map(parseQueryGroup.bind(group, fieldMap));
         obj.subType = key;
         break;
       case 'missing':
       case 'exists':
-        obj.field = group[key].field;
+
+        var fieldName = group[key].field;
+
+        var fieldData = fieldMap.filter(function(f){
+          return f.name == fieldName;
+        });
+
+        if(!fieldData.length) {console.log("No fieldData",fieldMap);return {};}
+
+        obj.field = fieldData[0];
+
         obj.subType = {
           exists: 'exists',
           missing: 'notExists',
@@ -101,19 +162,28 @@
         break;
       case 'term':
       case 'terms':
-        obj.field = Object.keys(group[key])[0];
-        var fieldData = fieldMap[Object.keys(group[key])[0]];
+
+        var fieldName = Object.keys(group[key])[0]
+
+        var fieldData = fieldMap.filter(function(f){
+          return f.name == fieldName;
+        });
+
+        if(!fieldData.length) {console.log("No fieldData",fieldMap);return {};}
+
+        obj.field = fieldData[0];
+
 
         if (fieldData.type === 'multi') {
-          var vals = group[key][obj.field];
+          var vals = group[key][fieldName];
           if (typeof vals === 'string') vals = [ vals ];
           obj.values = fieldData.choices.reduce(function(prev, choice) {
-            prev[choice] = group[key][obj.field].indexOf(choice) !== -1;
+            prev[choice] = group[key][fieldName].indexOf(choice) !== -1;
             return prev;
           }, {});
         } else {
           obj.subType = truthy ? 'equals' : 'notEquals';
-          obj.value = group[key][obj.field];
+          obj.value = group[key][fieldName];
 
           if (typeof obj.value === 'number') {
             obj.subType = 'boolean';
@@ -171,24 +241,39 @@
   function parseFilterGroup(fieldMap, $filter, group) {
     var obj = {};
     if (group.type === 'group') {
-      if(group.subType != 'should' && group.subType != 'must'){
-         obj = {filter:{}};
-        obj.filter[group.subType] = group.rules.map(parseFilterGroup.bind(group, fieldMap, $filter)).filter(function(item) {
+      obj = {};
+
+      if(group.subType === 'bool'){
+        var rules = (group.rules.map(parseFilterGroup.bind(group, fieldMap, $filter)).filter(function(item) {
           return !!item;
+        }));
+
+        obj[group.subType] = {}
+
+        rules.forEach(function(rule){
+          obj[group.subType][Object.keys(rule)[0]] = rule[Object.keys(rule)[0]];
         });
+
+        return obj;
       }
-      else{
-        obj[group.subType] = group.rules.map(parseFilterGroup.bind(group, fieldMap, $filter)).filter(function(item) {
-          return !!item;
-        });
-      }
+
+      obj[group.subType] = (group.rules.map(parseFilterGroup.bind(group, fieldMap, $filter)).filter(function(item) {
+        return !!item;
+      }));
 
       return obj;
     }
 
     var field = group.field;
     var fieldData = fieldMap.find(function(elmt){
-      return angular.equals(elmt,field);
+      if(typeof field == "object") {
+        return angular.equals(elmt,field);
+      }
+      else{
+        return elmt.name == field;
+      }
+
+
     });
 
     if(!fieldData) return;
@@ -225,7 +310,7 @@
             if (group.matchingPercent === undefined) return;
             obj = { match:{}};
             obj.match[fieldName] = {}
-            obj.match[fieldName]['query'] = "%queryname%";
+            obj.match[fieldName]['query'] = "%" + fieldName + "%"; //used for template engine
 
             obj.match[fieldName]['minimum_should_match'] = group.matchingPercent + "%";
             obj.match[fieldName]['operator'] = 'and';
@@ -235,17 +320,9 @@
             if (group.value === undefined) return;
             obj = { match_phrase:{}};
             obj.match_phrase[fieldName] = {}
-            obj.match_phrase[fieldName]['query'] = "%queryname%";
+            obj.match_phrase[fieldName]['query'] = "%" + fieldName + "%"; //used for template engine
             obj.match_phrase[fieldName]['slop'] = group.value;
 
-            break;
-          case 'notMatch':
-            if (group.matchingPercent === undefined) return;
-            obj.not = { match:{}};
-            obj.not.match[fieldName] = {}
-            obj.not.match[fieldName]['query'] = "%queryname%";
-            obj.not.match[fieldName]['minimum_should_match'] = group.matchingPercent + "%";
-            obj.not.match[fieldName]['operator'] = 'and';
             break;
           default:
             throw new Error('unexpected subtype ' + group.subType);
@@ -324,10 +401,11 @@
 
   function getFilterTemplate(type) {
     var templates = {
-      group: {
+      group:
+      {
         type: 'group',
         subType: '',
-        rules: [],
+        rules: []
       },
       item: {
         field: '',

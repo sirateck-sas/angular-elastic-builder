@@ -33,12 +33,25 @@
               group.rules.push({});
             };
             scope.addGroup = function() {
-              group.rules.push({
+
+              var newGroup = {
                 type: 'group',
-                subType: 'and',
-                rules: [],
-              });
-            };
+                subType: 'bool',
+                rules: [{
+                  type: 'group',
+                  subType: 'must',
+                  rules: [],
+                }],
+              };
+
+              if(group.subType == 'bool') newGroup = {
+                    type: 'group',
+                    subType: 'must',
+                    rules: [],
+                  };
+
+              group.rules.push(newGroup);
+            }
 
             scope.removeChild = function(idx) {
               group.rules.splice(idx, 1);

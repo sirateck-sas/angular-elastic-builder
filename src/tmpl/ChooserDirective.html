@@ -1,4 +1,4 @@
-<div
+<div ng-if="item.subType != 'bool'"
   class="list-group-item elastic-builder-chooser"
   data-ng-class="getGroupClassName()">
 
@@ -10,6 +10,18 @@
 
   <div data-ng-if="item.type !== 'group'"
     data-elastic-builder-rule="item"
+    data-elastic-fields="elasticFields"
+    data-on-remove="onRemove()"></div>
+
+</div>
+
+<div ng-if="item.subType == 'bool'"
+  class="list-group-item elastic-builder-chooser"
+  data-ng-class="getGroupClassName()">
+
+  <div data-ng-if="item.type === 'group'"
+    data-elastic-builder-group="item"
+    data-depth="{{ depth }}"
     data-elastic-fields="elasticFields"
     data-on-remove="onRemove()"></div>
 

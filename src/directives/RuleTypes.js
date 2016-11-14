@@ -53,8 +53,7 @@
 
           scope.inputPercentNeeded = function() {
             var needs = [
-              'match',
-              'notMatch',
+              'match'
             ];
 
             return ~needs.indexOf(scope.rule.subType);

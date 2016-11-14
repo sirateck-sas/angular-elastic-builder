@@ -25,7 +25,7 @@
           link: function(scope) {
             var data = scope.data;
 
-            scope.filters = [];
+            //Set Saved data
             if(data.filters) scope.filters = data.filters;
 
             /**
@@ -46,11 +46,17 @@
              * Adds a Group of Rules
              */
             scope.addGroup = function() {
-              scope.filters.push({
+              var newGroup = {
                 type: 'group',
-                subType: 'must',
-                rules: [],
-              });
+                subType: 'bool',
+                rules: [{
+                  type: 'group',
+                  subType: 'must',
+                  rules: [],
+                }],
+              };
+              scope.filters.push(newGroup);
+
             };
 
             /**
@@ -69,17 +75,8 @@
              */
             scope.$watch('filters', function(curr) {
               if (!curr) return;
-
-              var obj = {};
               var query = elasticQueryService.toQuery(scope.filters, scope.data.fields);
-
-             query.forEach(function(bool){
-                Object.keys(bool).forEach(function(key){
-                  obj[key] = bool[key];
-                });
-              });
-
-              data.query = obj;
+              data.query = query;
             }, true);
           },
         };
