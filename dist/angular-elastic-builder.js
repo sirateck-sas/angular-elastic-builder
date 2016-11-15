@@ -2,7 +2,7 @@
  * # angular-elastic-builder
  * ## Angular Module for building an Elasticsearch Query
  *
- * @version v1.5.1
+ * @version v1.5.2
  * @link https://github.com/sirateck-sas/angular-elastic-builder.git
  * @license MIT
  * @author Dan Crews <crewsd@gmail.com>
@@ -22,380 +22,6 @@
   angular.module('angular-elastic-builder', [
     'RecursionHelper',
     'ui.bootstrap',
-  ]);
-
-})(window.angular);
-
-/**
- * angular-elastic-builder
- *
- * /src/directives/BuilderDirective.js
- *
- * Angular Directive for injecting a query builder form.
- */
-
- (function(angular) {
-   'use strict';
-
-   angular.module('angular-elastic-builder')
-    .directive('elasticBuilder', [
-      'elasticQueryService',
-
-      function EB(elasticQueryService) {
-
-        return {
-          scope: {
-            data: '=elasticBuilder',
-          },
-
-          templateUrl: 'angular-elastic-builder/BuilderDirective.html',
-
-          link: function(scope) {
-            var data = scope.data;
-
-            //Set Saved data
-            if(data.filters) scope.filters = data.filters;
-
-            /**
-             * Removes either Group or Rule
-             */
-            scope.removeChild = function(idx) {
-              scope.filters.splice(idx, 1);
-            };
-
-            /**
-             * Adds a Single Rule
-             */
-            scope.addRule = function() {
-              scope.filters.push({});
-            };
-
-            /**
-             * Adds a Group of Rules
-             */
-            scope.addGroup = function() {
-              var newGroup = {
-                type: 'group',
-                subType: 'bool',
-                rules: [{
-                  type: 'group',
-                  subType: 'must',
-                  rules: [],
-                }],
-              };
-              scope.filters.push(newGroup);
-
-            };
-
-            /**
-             * Any time "outside forces" change the query, they should tell us so via
-             * `data.needsUpdate`
-             */
-            scope.$watch('data.needsUpdate', function(curr) {
-              if (!curr) return;
-              scope.filters = elasticQueryService.toFilters(data.query, scope.data.fields);
-
-              scope.data.needsUpdate = false;
-            });
-
-            /**
-             * Changes on the page update the Query
-             */
-            scope.$watch('filters', function(curr) {
-              if (!curr) return;
-              var query = elasticQueryService.toQuery(scope.filters, scope.data.fields);
-              data.query = query;
-            }, true);
-          },
-        };
-      },
-
-    ]);
-
- })(window.angular);
-
-/**
- * angular-elastic-builder
- *
- * /src/directives/Chooser.js
- *
- * This file is to help recursively, to decide whether to show a group or rule
- */
-
-(function(angular) {
-  'use strict';
-
-  var app = angular.module('angular-elastic-builder');
-
-  app.directive('elasticBuilderChooser', [
-    'RecursionHelper',
-    'groupClassHelper',
-
-    function elasticBuilderChooser(RH, groupClassHelper) {
-
-      return {
-        scope: {
-          elasticFields: '=',
-          item: '=elasticBuilderChooser',
-          onRemove: '&',
-        },
-
-        templateUrl: 'angular-elastic-builder/ChooserDirective.html',
-
-        compile: function (element) {
-          return RH.compile(element, function(scope, el, attrs) {
-            var depth = scope.depth = (+attrs.depth)
-              , item = scope.item;
-
-            scope.getGroupClassName = function() {
-              var level = depth;
-              if (item.type === 'group') level++;
-
-              return groupClassHelper(level);
-            };
-          });
-        },
-      };
-    },
-
-  ]);
-
-})(window.angular);
-
-/**
- * angular-elastic-builder
- *
- * /src/directives/Group.js
- */
-
-(function(angular) {
-  'use strict';
-
-  var app = angular.module('angular-elastic-builder');
-
-  app.directive('elasticBuilderGroup', [
-    'RecursionHelper',
-    'groupClassHelper',
-
-    function elasticBuilderGroup(RH, groupClassHelper) {
-
-      return {
-        scope: {
-          elasticFields: '=',
-          group: '=elasticBuilderGroup',
-          onRemove: '&',
-        },
-
-        templateUrl: 'angular-elastic-builder/GroupDirective.html',
-
-        compile: function(element) {
-          return RH.compile(element, function(scope, el, attrs) {
-            var depth = scope.depth = (+attrs.depth);
-            var group = scope.group;
-
-            scope.addRule = function() {
-              group.rules.push({});
-            };
-            scope.addGroup = function() {
-
-              var newGroup = {
-                type: 'group',
-                subType: 'bool',
-                rules: [{
-                  type: 'group',
-                  subType: 'must',
-                  rules: [],
-                }],
-              };
-
-              if(group.subType == 'bool') newGroup = {
-                    type: 'group',
-                    subType: 'must',
-                    rules: [],
-                  };
-
-              group.rules.push(newGroup);
-            }
-
-            scope.removeChild = function(idx) {
-              group.rules.splice(idx, 1);
-            };
-
-            scope.getGroupClassName = function() {
-              return groupClassHelper(depth + 1);
-            };
-          });
-        },
-      };
-    },
-
-  ]);
-
-})(window.angular);
-
-/**
- * angular-elastic-builder
- *
- * /src/directives/Rule.js
- */
-
-(function(angular) {
-  'use strict';
-
-  var app = angular.module('angular-elastic-builder');
-
-  app.directive('elasticBuilderRule', [
-
-    function elasticBuilderRule() {
-      return {
-        scope: {
-          elasticFields: '=',
-          rule: '=elasticBuilderRule',
-          onRemove: '&',
-        },
-
-        templateUrl: 'angular-elastic-builder/RuleDirective.html',
-
-        link: function(scope) {
-          scope.getType = function() {
-            var fields = scope.elasticFields
-              , field = scope.rule.field;
-
-            if (!fields || !field) return;
-
-            if (field.subType === 'boolean') return 'boolean';
-
-            return field.type;
-          };
-        },
-      };
-    },
-
-  ]);
-
-})(window.angular);
-
-/**
- * angular-elastic-builder
- *
- * /src/directives/RuleTypes.js
- *
- * Determines which Rule type should be displayed
- */
-
-(function(angular) {
-  'use strict';
-
-  var app = angular.module('angular-elastic-builder');
-
-  app.directive('elasticType', [
-
-    function() {
-      return {
-        scope: {
-          type: '=elasticType',
-          rule: '=',
-          guide: '=',
-        },
-
-        template: '<ng-include src="getTemplateUrl()" />',
-
-        link: function(scope) {
-          scope.getTemplateUrl = function() {
-            var type = scope.type;
-            if (!type) return;
-
-            type = type.charAt(0).toUpperCase() + type.slice(1);
-
-            return 'angular-elastic-builder/types/' + type + '.html';
-          };
-
-          // This is a weird hack to make sure these are numbers
-          scope.booleans = [ 'False', 'True' ];
-          scope.booleansOrder = [ 'True', 'False' ];
-
-          scope.inputNeeded = function() {
-            var needs = [
-              'equals',
-              'notEquals',
-              'match_phrase',
-              'gt',
-              'gte',
-              'lt',
-              'lte',
-            ];
-
-            return ~needs.indexOf(scope.rule.subType);
-          };
-
-          scope.inputPercentNeeded = function() {
-            var needs = [
-              'match'
-            ];
-
-            return ~needs.indexOf(scope.rule.subType);
-          };
-
-          scope.numberNeeded = function() {
-            var needs = [
-              'last',
-              'next',
-            ];
-
-            return ~needs.indexOf(scope.rule.subType);
-          };
-
-          scope.today = function() {
-            scope.rule.date = new Date();
-          };
-          scope.today();
-
-          scope.clear = function() {
-            scope.rule.date = null;
-          };
-
-          scope.dateOptions = {
-            dateDisabled: disabled,
-            formatYear: 'yy',
-            maxDate: new Date(2018, 1, 13),
-            minDate: new Date(),
-            startingDay: 1,
-          };
-
-          // Disable weekend selection
-          function disabled(data) {
-            var date = data.date
-              , mode = data.mode;
-            return mode === 'day' && (date.getDay() === 0 || date.getDay() === 6);
-          }
-
-          scope.open1 = function() {
-            scope.popup1.opened = true;
-          };
-
-          scope.setDate = function(year, month, day) {
-            scope.rule.date = new Date(year, month - 1, day);
-          };
-
-          scope.formats = [
-            'yyyy-MM-ddTHH:mm:ss',
-            'yyyy-MM-ddTHH:mm:ssZ',
-            'yyyy-MM-dd',
-            'dd-MMMM-yyyy',
-            'yyyy/MM/dd',
-            'shortDate',
-          ];
-          scope.rule.dateFormat = scope.formats[0];
-          scope.format = scope.rule.dateFormat;
-
-          scope.altInputFormats = ['M!/d!/yyyy'];
-
-          scope.popup1 = { opened: false };
-        },
-
-      };
-    },
-
   ]);
 
 })(window.angular);
@@ -858,6 +484,380 @@
     var fDate = $filter('date')(date, dateFormat);
     return fDate;
   }
+
+})(window.angular);
+
+/**
+ * angular-elastic-builder
+ *
+ * /src/directives/BuilderDirective.js
+ *
+ * Angular Directive for injecting a query builder form.
+ */
+
+ (function(angular) {
+   'use strict';
+
+   angular.module('angular-elastic-builder')
+    .directive('elasticBuilder', [
+      'elasticQueryService',
+
+      function EB(elasticQueryService) {
+
+        return {
+          scope: {
+            data: '=elasticBuilder',
+          },
+
+          templateUrl: 'angular-elastic-builder/BuilderDirective.html',
+
+          link: function(scope) {
+            var data = scope.data;
+
+            //Set Saved data
+            if(data.filters) scope.filters = data.filters;
+
+            /**
+             * Removes either Group or Rule
+             */
+            scope.removeChild = function(idx) {
+              scope.filters.splice(idx, 1);
+            };
+
+            /**
+             * Adds a Single Rule
+             */
+            scope.addRule = function() {
+              scope.filters.push({});
+            };
+
+            /**
+             * Adds a Group of Rules
+             */
+            scope.addGroup = function() {
+              var newGroup = {
+                type: 'group',
+                subType: 'bool',
+                rules: [{
+                  type: 'group',
+                  subType: 'must',
+                  rules: [],
+                }],
+              };
+              scope.filters.push(newGroup);
+
+            };
+
+            /**
+             * Any time "outside forces" change the query, they should tell us so via
+             * `data.needsUpdate`
+             */
+            scope.$watch('data.needsUpdate', function(curr) {
+              if (!curr) return;
+              scope.filters = elasticQueryService.toFilters(data.query, scope.data.fields);
+
+              scope.data.needsUpdate = false;
+            });
+
+            /**
+             * Changes on the page update the Query
+             */
+            scope.$watch('filters', function(curr) {
+              if (!curr) return;
+              var query = elasticQueryService.toQuery(scope.filters, scope.data.fields);
+              data.query = query;
+            }, true);
+          },
+        };
+      },
+
+    ]);
+
+ })(window.angular);
+
+/**
+ * angular-elastic-builder
+ *
+ * /src/directives/Chooser.js
+ *
+ * This file is to help recursively, to decide whether to show a group or rule
+ */
+
+(function(angular) {
+  'use strict';
+
+  var app = angular.module('angular-elastic-builder');
+
+  app.directive('elasticBuilderChooser', [
+    'RecursionHelper',
+    'groupClassHelper',
+
+    function elasticBuilderChooser(RH, groupClassHelper) {
+
+      return {
+        scope: {
+          elasticFields: '=',
+          item: '=elasticBuilderChooser',
+          onRemove: '&',
+        },
+
+        templateUrl: 'angular-elastic-builder/ChooserDirective.html',
+
+        compile: function (element) {
+          return RH.compile(element, function(scope, el, attrs) {
+            var depth = scope.depth = (+attrs.depth)
+              , item = scope.item;
+
+            scope.getGroupClassName = function() {
+              var level = depth;
+              if (item.type === 'group') level++;
+
+              return groupClassHelper(level);
+            };
+          });
+        },
+      };
+    },
+
+  ]);
+
+})(window.angular);
+
+/**
+ * angular-elastic-builder
+ *
+ * /src/directives/Group.js
+ */
+
+(function(angular) {
+  'use strict';
+
+  var app = angular.module('angular-elastic-builder');
+
+  app.directive('elasticBuilderGroup', [
+    'RecursionHelper',
+    'groupClassHelper',
+
+    function elasticBuilderGroup(RH, groupClassHelper) {
+
+      return {
+        scope: {
+          elasticFields: '=',
+          group: '=elasticBuilderGroup',
+          onRemove: '&',
+        },
+
+        templateUrl: 'angular-elastic-builder/GroupDirective.html',
+
+        compile: function(element) {
+          return RH.compile(element, function(scope, el, attrs) {
+            var depth = scope.depth = (+attrs.depth);
+            var group = scope.group;
+
+            scope.addRule = function() {
+              group.rules.push({});
+            };
+            scope.addGroup = function() {
+
+              var newGroup = {
+                type: 'group',
+                subType: 'bool',
+                rules: [{
+                  type: 'group',
+                  subType: 'must',
+                  rules: [],
+                }],
+              };
+
+              if(group.subType == 'bool') newGroup = {
+                    type: 'group',
+                    subType: 'must',
+                    rules: [],
+                  };
+
+              group.rules.push(newGroup);
+            }
+
+            scope.removeChild = function(idx) {
+              group.rules.splice(idx, 1);
+            };
+
+            scope.getGroupClassName = function() {
+              return groupClassHelper(depth + 1);
+            };
+          });
+        },
+      };
+    },
+
+  ]);
+
+})(window.angular);
+
+/**
+ * angular-elastic-builder
+ *
+ * /src/directives/Rule.js
+ */
+
+(function(angular) {
+  'use strict';
+
+  var app = angular.module('angular-elastic-builder');
+
+  app.directive('elasticBuilderRule', [
+
+    function elasticBuilderRule() {
+      return {
+        scope: {
+          elasticFields: '=',
+          rule: '=elasticBuilderRule',
+          onRemove: '&',
+        },
+
+        templateUrl: 'angular-elastic-builder/RuleDirective.html',
+
+        link: function(scope) {
+          scope.getType = function() {
+            var fields = scope.elasticFields
+              , field = scope.rule.field;
+
+            if (!fields || !field) return;
+
+            if (field.subType === 'boolean') return 'boolean';
+
+            return field.type;
+          };
+        },
+      };
+    },
+
+  ]);
+
+})(window.angular);
+
+/**
+ * angular-elastic-builder
+ *
+ * /src/directives/RuleTypes.js
+ *
+ * Determines which Rule type should be displayed
+ */
+
+(function(angular) {
+  'use strict';
+
+  var app = angular.module('angular-elastic-builder');
+
+  app.directive('elasticType', [
+
+    function() {
+      return {
+        scope: {
+          type: '=elasticType',
+          rule: '=',
+          guide: '=',
+        },
+
+        template: '<ng-include src="getTemplateUrl()" />',
+
+        link: function(scope) {
+          scope.getTemplateUrl = function() {
+            var type = scope.type;
+            if (!type) return;
+
+            type = type.charAt(0).toUpperCase() + type.slice(1);
+
+            return 'angular-elastic-builder/types/' + type + '.html';
+          };
+
+          // This is a weird hack to make sure these are numbers
+          scope.booleans = [ 'False', 'True' ];
+          scope.booleansOrder = [ 'True', 'False' ];
+
+          scope.inputNeeded = function() {
+            var needs = [
+              'equals',
+              'notEquals',
+              'match_phrase',
+              'gt',
+              'gte',
+              'lt',
+              'lte',
+            ];
+
+            return ~needs.indexOf(scope.rule.subType);
+          };
+
+          scope.inputPercentNeeded = function() {
+            var needs = [
+              'match'
+            ];
+
+            return ~needs.indexOf(scope.rule.subType);
+          };
+
+          scope.numberNeeded = function() {
+            var needs = [
+              'last',
+              'next',
+            ];
+
+            return ~needs.indexOf(scope.rule.subType);
+          };
+
+          scope.today = function() {
+            scope.rule.date = new Date();
+          };
+          scope.today();
+
+          scope.clear = function() {
+            scope.rule.date = null;
+          };
+
+          scope.dateOptions = {
+            dateDisabled: disabled,
+            formatYear: 'yy',
+            maxDate: new Date(2018, 1, 13),
+            minDate: new Date(),
+            startingDay: 1,
+          };
+
+          // Disable weekend selection
+          function disabled(data) {
+            var date = data.date
+              , mode = data.mode;
+            return mode === 'day' && (date.getDay() === 0 || date.getDay() === 6);
+          }
+
+          scope.open1 = function() {
+            scope.popup1.opened = true;
+          };
+
+          scope.setDate = function(year, month, day) {
+            scope.rule.date = new Date(year, month - 1, day);
+          };
+
+          scope.formats = [
+            'yyyy-MM-ddTHH:mm:ss',
+            'yyyy-MM-ddTHH:mm:ssZ',
+            'yyyy-MM-dd',
+            'dd-MMMM-yyyy',
+            'yyyy/MM/dd',
+            'shortDate',
+          ];
+          scope.rule.dateFormat = scope.formats[0];
+          scope.format = scope.rule.dateFormat;
+
+          scope.altInputFormats = ['M!/d!/yyyy'];
+
+          scope.popup1 = { opened: false };
+        },
+
+      };
+    },
+
+  ]);
 
 })(window.angular);
 
