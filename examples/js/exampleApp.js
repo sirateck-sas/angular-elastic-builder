@@ -7,80 +7,48 @@
   app.controller('BasicController', function() {
 
     var data = this.data = {};
+    data.filters = [];
+    data.query = { bool:{ must:[
+                            {
+                              match: {
+                                "title": {
+                                  query: "%title%",
+                                  minimum_should_match: "100%",
+                                  operator: "and"
+                                }
+                              }
+                            }
+                          ],
+                    }
+                  };
 
-    data.query = [
-      {
-        'and': [
-          {
-            'term': {
-              'test.date': '2016-04-08T09:16:48'
-            }
-          },
-          {
-            'range': {
-              'test.number': {
-                'gte': 650
-              }
-            }
-          },
-          {
-            'range': {
-              'test.number': {
-                'lt': 850
-              }
-            }
-          }
-        ]
-      },
-      {
-        'term': {
-          'test.boolean': 0
-        }
-      },
-      {
-        'terms': {
-          'test.state.multi': [ 'AZ', 'CT' ]
-        }
-      },
-      {
-        'not': {
-          'filter': {
-            'term': {
-              'test.term': 'asdfasdf'
-            }
-          }
-        }
-      },
-      {
-        'exists': {
-          'field': 'test.term'
-        }
-      },
-      {
-        'range': {
-          'test.otherdate': {
-            'gte': 'now',
-            'lte': 'now+7d'
-          }
-        }
-      }
+    var fields = [
+     //{name:'test.number', title: 'Test Number', type: 'number', minimum: 650 },
+     {name:'title', title: 'Nom', type: 'term' },
+     {name:'category', title: 'Catégorie', type: 'term', options: ["cat1","cat2"]},
+     {name:'price', title: 'Prix', type: 'number' },
+     {name:'brand', title: 'Marque', type: 'term'},
+     {name:'sku', title: 'SKU', type: 'term' },
+     {name:'ean', title: 'Ean', type: 'term' },
+     {name:'isbn', title: 'Isbn', type: 'term' },
+     {name:'mpn', title: 'Mpn', type: 'term' }
+
+
+     /*'test.boolean': { title: 'Test Boolean', type: 'boolean' },
+     'test.state.multi': { title: 'Test Multi', type: 'multi', choices: [ 'AZ', 'CA', 'CT' ]},
+     'test.date': { title: 'Test Date', type: 'date' },
+     'test.otherdate': { title: 'Test Other Date', type: 'date' },
+     'test.match': { title: 'Test Match', type: 'match' }*/
     ];
 
-    data.fields = {
-      'test.number': { type: 'number', minimum: 650 },
-      'test.term': { type: 'term' },
-      'test.boolean': { type: 'term', subType: 'boolean' },
-      'test.state.multi': { type: 'multi', choices: [ 'AZ', 'CA', 'CT' ]},
-      'test.date': { type: 'date' },
-      'test.otherdate': { type: 'date' }
-    };
+    data.fields = fields;
 
     data.needsUpdate = true;
 
     this.showQuery = function() {
       var queryToShow = {
         size: 0,
-        filter: { and : data.query }
+        query: data.query
       };
 
       return JSON.stringify(queryToShow, null, 2);

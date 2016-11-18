@@ -22,10 +22,14 @@
 
   </select>
   <input
-    data-ng-if="inputNeeded()"
+    data-ng-if="inputNeeded() && (!guide.options.length || (guide.options.length && (rule.subType != 'notEquals' && rule.subType != 'equals')))"
     class="form-control"
     data-ng-model="rule.value"
     type="text">
+
+    <select data-ng-if="inputNeeded() && guide.options.length && (rule.subType == 'notEquals' || rule.subType == 'equals')" class="form-control select2" data-ng-model="rule.value">
+        <option  data-ng-repeat="option in guide.options" value="{{option}}">{{option}}</option>
+    </select>
 
     <input
     data-ng-if="inputPercentNeeded()"

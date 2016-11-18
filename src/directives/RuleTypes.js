@@ -18,7 +18,7 @@
         scope: {
           type: '=elasticType',
           rule: '=',
-          guide: '=',
+          guide: '='
         },
 
         template: '<ng-include src="getTemplateUrl()" />',

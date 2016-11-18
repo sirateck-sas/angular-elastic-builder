@@ -1,7 +1,7 @@
 <div class="elastic-builder-rule">
   <select class="form-control" data-ng-model="rule.field" data-ng-options="field as field.title for (key,field) in elasticFields track by field.name"></select>
 
-  <span data-elastic-type="getType()" data-rule="rule" data-guide="elasticFields[rule.field]"></span>
+  <span data-elastic-type="getType()" data-rule="rule" data-guide="rule.field"></span>
 
   <a class="btn btn-xs btn-danger remover" data-ng-click="onRemove()">
     <i class="fa fa-minus"></i>

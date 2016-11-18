@@ -181,7 +181,11 @@
             prev[choice] = group[key][fieldName].indexOf(choice) !== -1;
             return prev;
           }, {});
-        } else {
+        }
+        else if(fieldData.type == 'select'){
+          obj.value = group[key][fieldName];
+        }
+        else {
           obj.subType = truthy ? 'equals' : 'notEquals';
           obj.value = group[key][fieldName];
 
@@ -390,6 +394,11 @@
 
           return prev;
         }, []);
+        break;
+      case 'select':
+        if (group.value === undefined) return;
+        obj.terms = {};
+        obj.terms[fieldName] = group.value;
         break;
 
       default:
