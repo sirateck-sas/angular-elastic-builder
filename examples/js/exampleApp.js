@@ -8,7 +8,14 @@
 
     var data = this.data = {};
     data.filters = [];
-    data.query = { bool:{ must:[
+    data.query =
+    {
+        nested:{
+          path: "attributes",
+          query:{
+            bool:
+                  {
+                    must:[
                             {
                               match: {
                                 "title": {
@@ -17,15 +24,90 @@
                                   operator: "and"
                                 }
                               }
+                            },
+                            {
+                             term: {
+                               "attributes.name": "Color"
+                             }
+                           },
+                           {
+                             term: {
+                               "attributes.values": "blue"
+                             }
+                           },
+                           {
+                            "term": {
+                              "category": "cat1"
                             }
-                          ],
+                          },
+                          {
+                            "term": {
+                              "brand": "spilu"
+                            }
+                          },
+                          {
+                            "range": {
+                              "price": {
+                                "gte": 40
+                              }
+                            }
+                          }
+                      ],
                     }
-                  };
+                  }
+                }
+            };
+
+    /*data.query = {
+      bool:
+            {
+              must:[
+                      {
+                        match: {
+                          "title": {
+                            query: "%title%",
+                            minimum_should_match: "100%",
+                            operator: "and"
+                          }
+                        }
+                      },
+                      {
+                       term: {
+                         "attributes.name": "Color"
+                       }
+                     },
+                     {
+                       term: {
+                         "attributes.values": "blue"
+                       }
+                     },
+                     {
+                      "term": {
+                        "category": "cat1"
+                      }
+                    },
+                    {
+                      "term": {
+                        "brand": "spilu"
+                      }
+                    },
+                    {
+                      "range": {
+                        "price": {
+                          "gte": 40
+                        }
+                      }
+                    }
+                ],
+              }
+            };*/
 
     var fields = [
      //{name:'test.number', title: 'Test Number', type: 'number', minimum: 650 },
      {name:'title', title: 'Nom', type: 'term' },
      {name:'category', title: 'Catégorie', type: 'term', options: ["cat1","cat2"]},
+     {name:'attributes', title: 'Attribute', type: 'term',nested:true,fieldKey:'name',fieldValue:'values', options: [{name:'Color',values: ["blue","green",'yellow']}]},
+     //{name:'attributes', title: 'Size', type: 'term',nested:true,fieldKey:'name',fieldValue:'value', options: ["S","M",'L','XL']},
      {name:'price', title: 'Prix', type: 'number' },
      {name:'brand', title: 'Marque', type: 'term'},
      {name:'sku', title: 'SKU', type: 'term' },

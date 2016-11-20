@@ -1,4 +1,5 @@
 <span class="elastic-term">
+
   <select data-ng-model="rule.subType" class="form-control">
 
     <!-- Matching Options -->
@@ -11,25 +12,37 @@
     <!-- Term Options -->
     <optgroup label="Text">
       <option value="equals">Equals</option>
-      <option value="notEquals">! Equals</option>
+      <!-- <option value="notEquals">! Equals</option> -->
     </optgroup>
 
     <!-- Generic Options -->
     <optgroup label="Generic">
       <option value="exists">Exists</option>
-      <option value="notExists">! Exists</option>
+      <!-- <option value="notExists">! Exists</option> -->
     </optgroup>
 
   </select>
   <input
-    data-ng-if="inputNeeded() && (!guide.options.length || (guide.options.length && (rule.subType != 'notEquals' && rule.subType != 'equals')))"
+    data-ng-if="inputNeeded() && !isSelect() && !isNested()"
     class="form-control"
     data-ng-model="rule.value"
     type="text">
 
-    <select data-ng-if="inputNeeded() && guide.options.length && (rule.subType == 'notEquals' || rule.subType == 'equals')" class="form-control select2" data-ng-model="rule.value">
+
+    <select data-ng-if="inputNeeded() && isSelect()" class="form-control select2" data-ng-model="rule.value">
         <option  data-ng-repeat="option in guide.options" value="{{option}}">{{option}}</option>
     </select>
+
+    <select data-ng-if="inputNeeded() && isNested()" ng-change="keyValueChanged(rule.valueKey)" class="form-control select2" data-ng-model="rule.valueKey">
+        <option  data-ng-repeat="option in guide.options" value="{{option[guide.fieldKey]}}">{{option[guide.fieldKey]}}</option>
+    </select>
+
+
+    <select data-ng-disabled="!rule.valueKey" data-ng-if="inputNeeded() && isNested()" class="form-control select2" data-ng-model="rule.value">
+        <option  data-ng-repeat="value in rule[guide.fieldValue]" value="{{value}}">{{value}}</option>
+    </select>
+
+
 
     <input
     data-ng-if="inputPercentNeeded()"

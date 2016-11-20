@@ -33,6 +33,29 @@
             return 'angular-elastic-builder/types/' + type + '.html';
           };
 
+          scope.isSelect = function(){
+            return !scope.guide.nested && scope.guide.options.length && (scope.rule.subType == 'notEquals' || scope.rule.subType == 'equals');
+          }
+
+          scope.isNested = function(){
+            return scope.guide.nested && scope.guide.options.length && (scope.rule.subType == 'notEquals' || scope.rule.subType == 'equals');
+          }
+
+          scope.keyValueChanged = function(keyValue){
+
+              if(!keyValue) return;
+
+              var options = scope.guide.options.filter(function(opt){
+                  return opt[scope.guide.fieldKey] == scope.rule.valueKey;
+              })
+
+              if(options.length){
+                var values = options[0][scope.guide.fieldValue];
+                scope.rule[scope.guide.fieldValue] = values;
+              }
+          };
+
+
           // This is a weird hack to make sure these are numbers
           scope.booleans = [ 'False', 'True' ];
           scope.booleansOrder = [ 'True', 'False' ];

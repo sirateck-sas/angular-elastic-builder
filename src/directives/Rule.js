@@ -28,6 +28,8 @@
 
             if (!fields || !field) return;
 
+            if(!field.options) field.options = [];
+
             if (field.subType === 'boolean') return 'boolean';
 
             return field.type;

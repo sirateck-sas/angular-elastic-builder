@@ -26,10 +26,20 @@
 
   function toFilters(query, fieldMap){
     var q = [];
+    var cleanQuery = {};
 
-    Object.keys(query).forEach(function(key){
+    //Remove nested depth
+    if(query.nested){
+        cleanQuery = query.nested.query;
+    }
+    else{
+      cleanQuery = query;
+    }
+
+    //Transform query into an array
+    Object.keys(cleanQuery).forEach(function(key){
       var o = {};
-      o[key] =  query[key];
+      o[key] =  cleanQuery[key];
       q.push(o);
     });
 
@@ -71,6 +81,22 @@
       return !!item;
     });
 
+    var searchNestedField = function(filters){
+      var fieldNested = null;
+      filters.forEach(function(filter){
+        if(!filter.field && filter.rules && filter.rules.length){
+          fieldNested = searchNestedField(filter.rules);
+        }
+
+        if(filter.field && filter.field.nested){ //We have a nested field at least
+          fieldNested = filter.field;
+          return fieldNested;
+        }
+      });
+
+      return fieldNested;
+    };
+
     var obj = {};
 
      query.forEach(function(q){
@@ -78,6 +104,17 @@
           obj[key] = q[key];
         });
       });
+
+    var fieldNested = searchNestedField(filters);
+
+    if(fieldNested){
+      obj = {
+          nested: {
+            path: fieldNested.nestedPath || fieldNested.name,
+            query: {bool: obj.bool},
+          }
+      };
+    }
 
     return obj;
 
@@ -163,27 +200,71 @@
       case 'term':
       case 'terms':
 
-        var fieldName = Object.keys(group[key])[0]
+
+        var originalFieldName = Object.keys(group[key])[0];
+        var fieldName = originalFieldName;
+        if(~originalFieldName.indexOf('.')) {
+          fieldName = fieldName.split('.')[0];
+        }
 
         var fieldData = fieldMap.filter(function(f){
           return f.name == fieldName;
         });
+
 
         if(!fieldData.length) {console.log("No fieldData",fieldMap);return {};}
 
         obj.field = fieldData[0];
 
 
-        if (fieldData.type === 'multi') {
+        if (obj.field.type === 'multi') {
           var vals = group[key][fieldName];
           if (typeof vals === 'string') vals = [ vals ];
-          obj.values = fieldData.choices.reduce(function(prev, choice) {
+          obj.values = obj.field.choices.reduce(function(prev, choice) {
             prev[choice] = group[key][fieldName].indexOf(choice) !== -1;
             return prev;
           }, {});
         }
-        else if(fieldData.type == 'select'){
-          obj.value = group[key][fieldName];
+        else if(obj.field.options && obj.field.options.length){
+
+          if(obj.field.nested){
+            var fieldKey = obj.field.fieldKey || 'name';
+            var fieldValue = obj.field.fieldValue || 'value';
+            var fieldKeyPath = fieldName + '.' + fieldKey;
+            var fieldValuePath = fieldName + '.' + fieldValue;
+            obj.valueKey = group[key][fieldKeyPath];
+            obj.value = group[key][fieldValuePath];
+            obj.subType = 'equals';
+            obj.field.options.forEach(function(o){
+              if(o.name ==  obj.valueKey) {
+                obj[fieldValue] = o[fieldValue];
+              }
+            });
+
+            //search value key
+            if(!obj.valueKey && obj.value){
+              var valueKey = '';
+                obj.field.options.forEach(function(o){
+
+                  o[fieldValue].forEach(function(v){
+                    if(v == obj.value) {
+                      obj.valueKey = o[fieldKey];
+                      obj[fieldValue] = o[fieldValue];
+                      return;
+                    }
+                    return;
+                  });
+                  if(obj.valueKey) return;
+
+                  });
+            }
+
+          }
+          else{
+              obj.value = group[key][fieldName];
+              obj.subType = 'equals';
+          }
+
         }
         else {
           obj.subType = truthy ? 'equals' : 'notEquals';
@@ -196,16 +277,25 @@
         break;
       case 'range':
         var date, parts;
-        obj.field = Object.keys(group[key])[0];
-        obj.subType = Object.keys(group[key][obj.field])[0];
+        var fieldName = Object.keys(group[key])[0];
+        var fieldData = fieldMap.filter(function(f){
+          return f.name == fieldName;
+        });
 
-        if (angular.isNumber(group[key][obj.field][obj.subType])) {
-          obj.value = group[key][obj.field][obj.subType];
+        if(!fieldData.length) {console.log("No fieldData",fieldMap);return {};}
+
+        obj.field = fieldData[0];
+
+        //obj.field = Object.keys(group[key])[0];
+        obj.subType = Object.keys(group[key][fieldName])[0];
+
+        if (angular.isNumber(group[key][fieldName][obj.subType])) {
+          obj.value = group[key][fieldName][obj.subType];
           break;
         }
 
-        if (angular.isDefined(Object.keys(group[key][obj.field])[1])) {
-          date = group[key][obj.field].gte;
+        if (angular.isDefined(Object.keys(group[key][fieldName])[1])) {
+          date = group[key][fieldName].gte;
 
           if (~date.indexOf('now-')) {
             obj.subType = 'last';
@@ -215,7 +305,7 @@
 
           if (~date.indexOf('now')) {
             obj.subType = 'next';
-            date = group[key][obj.field].lte;
+            date = group[key][fieldName].lte;
             obj.value = parseInt(date.split('now+')[1].split('d')[0]);
             break;
           }
@@ -226,7 +316,7 @@
           break;
         }
 
-        date = group[key][obj.field][obj.subType];
+        date = group[key][fieldName][obj.subType];
         parts = date.split('T')[0].split('-');
         obj.date = parts[2] + '/' + parts[1] + '/' + parts[0];
         break;
@@ -293,9 +383,32 @@
         switch (group.subType) {
           case 'equals':
           case 'boolean':
-            if (group.value === undefined) return;
-            obj.term = {};
-            obj.term[fieldName] = group.value;
+            if (!fieldData.nested && !group.value === undefined) return;
+
+
+            if(fieldData.nested){
+              obj.term = {};
+
+             //var nestedPath = fieldData.nestedPath || fieldName;
+              var fieldKey = fieldData.fieldKey || 'name';
+              var fieldValue = fieldData.fieldValue || 'value';
+              var fieldKeyPath = fieldName + '.' + fieldKey;
+              var fieldValuePath = fieldName + '.' + fieldValue
+              if(group.value)
+              {
+                obj.term[fieldValuePath]  = group.value;
+              }
+              else{
+                obj.term[fieldKeyPath]  = group.valueKey;
+              }
+
+
+            }
+            else{
+              obj.term = {};
+              obj.term[fieldName] = group.value;
+            }
+
             break;
           case 'notEquals':
             if (group.value === undefined) return;
@@ -394,11 +507,6 @@
 
           return prev;
         }, []);
-        break;
-      case 'select':
-        if (group.value === undefined) return;
-        obj.terms = {};
-        obj.terms[fieldName] = group.value;
         break;
 
       default:

@@ -263,6 +263,8 @@
 
             if (!fields || !field) return;
 
+            if(!field.options) field.options = [];
+
             if (field.subType === 'boolean') return 'boolean';
 
             return field.type;
@@ -309,6 +311,29 @@
 
             return 'angular-elastic-builder/types/' + type + '.html';
           };
+
+          scope.isSelect = function(){
+            return !scope.guide.nested && scope.guide.options.length && (scope.rule.subType == 'notEquals' || scope.rule.subType == 'equals');
+          }
+
+          scope.isNested = function(){
+            return scope.guide.nested && scope.guide.options.length && (scope.rule.subType == 'notEquals' || scope.rule.subType == 'equals');
+          }
+
+          scope.keyValueChanged = function(keyValue){
+
+              if(!keyValue) return;
+
+              var options = scope.guide.options.filter(function(opt){
+                  return opt[scope.guide.fieldKey] == scope.rule.valueKey;
+              })
+
+              if(options.length){
+                var values = options[0][scope.guide.fieldValue];
+                scope.rule[scope.guide.fieldValue] = values;
+              }
+          };
+
 
           // This is a weird hack to make sure these are numbers
           scope.booleans = [ 'False', 'True' ];
@@ -457,10 +482,20 @@
 
   function toFilters(query, fieldMap){
     var q = [];
+    var cleanQuery = {};
 
-    Object.keys(query).forEach(function(key){
+    //Remove nested depth
+    if(query.nested){
+        cleanQuery = query.nested.query;
+    }
+    else{
+      cleanQuery = query;
+    }
+
+    //Transform query into an array
+    Object.keys(cleanQuery).forEach(function(key){
       var o = {};
-      o[key] =  query[key];
+      o[key] =  cleanQuery[key];
       q.push(o);
     });
 
@@ -502,6 +537,22 @@
       return !!item;
     });
 
+    var searchNestedField = function(filters){
+      var fieldNested = null;
+      filters.forEach(function(filter){
+        if(!filter.field && filter.rules && filter.rules.length){
+          fieldNested = searchNestedField(filter.rules);
+        }
+
+        if(filter.field && filter.field.nested){ //We have a nested field at least
+          fieldNested = filter.field;
+          return fieldNested;
+        }
+      });
+
+      return fieldNested;
+    };
+
     var obj = {};
 
      query.forEach(function(q){
@@ -509,6 +560,17 @@
           obj[key] = q[key];
         });
       });
+
+    var fieldNested = searchNestedField(filters);
+
+    if(fieldNested){
+      obj = {
+          nested: {
+            path: fieldNested.nestedPath || fieldNested.name,
+            query: {bool: obj.bool},
+          }
+      };
+    }
 
     return obj;
 
@@ -594,27 +656,71 @@
       case 'term':
       case 'terms':
 
-        var fieldName = Object.keys(group[key])[0]
+
+        var originalFieldName = Object.keys(group[key])[0];
+        var fieldName = originalFieldName;
+        if(~originalFieldName.indexOf('.')) {
+          fieldName = fieldName.split('.')[0];
+        }
 
         var fieldData = fieldMap.filter(function(f){
           return f.name == fieldName;
         });
+
 
         if(!fieldData.length) {console.log("No fieldData",fieldMap);return {};}
 
         obj.field = fieldData[0];
 
 
-        if (fieldData.type === 'multi') {
+        if (obj.field.type === 'multi') {
           var vals = group[key][fieldName];
           if (typeof vals === 'string') vals = [ vals ];
-          obj.values = fieldData.choices.reduce(function(prev, choice) {
+          obj.values = obj.field.choices.reduce(function(prev, choice) {
             prev[choice] = group[key][fieldName].indexOf(choice) !== -1;
             return prev;
           }, {});
         }
-        else if(fieldData.type == 'select'){
-          obj.value = group[key][fieldName];
+        else if(obj.field.options && obj.field.options.length){
+
+          if(obj.field.nested){
+            var fieldKey = obj.field.fieldKey || 'name';
+            var fieldValue = obj.field.fieldValue || 'value';
+            var fieldKeyPath = fieldName + '.' + fieldKey;
+            var fieldValuePath = fieldName + '.' + fieldValue;
+            obj.valueKey = group[key][fieldKeyPath];
+            obj.value = group[key][fieldValuePath];
+            obj.subType = 'equals';
+            obj.field.options.forEach(function(o){
+              if(o.name ==  obj.valueKey) {
+                obj[fieldValue] = o[fieldValue];
+              }
+            });
+
+            //search value key
+            if(!obj.valueKey && obj.value){
+              var valueKey = '';
+                obj.field.options.forEach(function(o){
+
+                  o[fieldValue].forEach(function(v){
+                    if(v == obj.value) {
+                      obj.valueKey = o[fieldKey];
+                      obj[fieldValue] = o[fieldValue];
+                      return;
+                    }
+                    return;
+                  });
+                  if(obj.valueKey) return;
+
+                  });
+            }
+
+          }
+          else{
+              obj.value = group[key][fieldName];
+              obj.subType = 'equals';
+          }
+
         }
         else {
           obj.subType = truthy ? 'equals' : 'notEquals';
@@ -627,16 +733,25 @@
         break;
       case 'range':
         var date, parts;
-        obj.field = Object.keys(group[key])[0];
-        obj.subType = Object.keys(group[key][obj.field])[0];
+        var fieldName = Object.keys(group[key])[0];
+        var fieldData = fieldMap.filter(function(f){
+          return f.name == fieldName;
+        });
 
-        if (angular.isNumber(group[key][obj.field][obj.subType])) {
-          obj.value = group[key][obj.field][obj.subType];
+        if(!fieldData.length) {console.log("No fieldData",fieldMap);return {};}
+
+        obj.field = fieldData[0];
+
+        //obj.field = Object.keys(group[key])[0];
+        obj.subType = Object.keys(group[key][fieldName])[0];
+
+        if (angular.isNumber(group[key][fieldName][obj.subType])) {
+          obj.value = group[key][fieldName][obj.subType];
           break;
         }
 
-        if (angular.isDefined(Object.keys(group[key][obj.field])[1])) {
-          date = group[key][obj.field].gte;
+        if (angular.isDefined(Object.keys(group[key][fieldName])[1])) {
+          date = group[key][fieldName].gte;
 
           if (~date.indexOf('now-')) {
             obj.subType = 'last';
@@ -646,7 +761,7 @@
 
           if (~date.indexOf('now')) {
             obj.subType = 'next';
-            date = group[key][obj.field].lte;
+            date = group[key][fieldName].lte;
             obj.value = parseInt(date.split('now+')[1].split('d')[0]);
             break;
           }
@@ -657,7 +772,7 @@
           break;
         }
 
-        date = group[key][obj.field][obj.subType];
+        date = group[key][fieldName][obj.subType];
         parts = date.split('T')[0].split('-');
         obj.date = parts[2] + '/' + parts[1] + '/' + parts[0];
         break;
@@ -724,9 +839,32 @@
         switch (group.subType) {
           case 'equals':
           case 'boolean':
-            if (group.value === undefined) return;
-            obj.term = {};
-            obj.term[fieldName] = group.value;
+            if (!fieldData.nested && !group.value === undefined) return;
+
+
+            if(fieldData.nested){
+              obj.term = {};
+
+             //var nestedPath = fieldData.nestedPath || fieldName;
+              var fieldKey = fieldData.fieldKey || 'name';
+              var fieldValue = fieldData.fieldValue || 'value';
+              var fieldKeyPath = fieldName + '.' + fieldKey;
+              var fieldValuePath = fieldName + '.' + fieldValue
+              if(group.value)
+              {
+                obj.term[fieldValuePath]  = group.value;
+              }
+              else{
+                obj.term[fieldKeyPath]  = group.valueKey;
+              }
+
+
+            }
+            else{
+              obj.term = {};
+              obj.term[fieldName] = group.value;
+            }
+
             break;
           case 'notEquals':
             if (group.value === undefined) return;
@@ -826,11 +964,6 @@
           return prev;
         }, []);
         break;
-      case 'select':
-        if (group.value === undefined) return;
-        obj.terms = {};
-        obj.terms[fieldName] = group.value;
-        break;
 
       default:
         throw new Error('unexpected type');
@@ -879,4 +1012,4 @@ $templateCache.put("angular-elastic-builder/types/Date.html","<span class=\"date
 $templateCache.put("angular-elastic-builder/types/Multi.html","<span class=\"multi-rule\">\n  <span data-ng-repeat=\"choice in guide.choices\">\n    <label class=\"checkbox\">\n      <input type=\"checkbox\" data-ng-model=\"rule.values[choice]\">\n      {{ choice }}\n    </label>\n  </span>\n</span>\n");
 $templateCache.put("angular-elastic-builder/types/Number.html","<span class=\"number-rule\">\n  <select data-ng-model=\"rule.subType\" class=\"form-control\">\n    <optgroup label=\"Numeral\">\n      <option value=\"equals\">=</option>\n      <option value=\"gt\">&gt;</option>\n      <option value=\"gte\">&ge;</option>\n      <option value=\"lt\">&lt;</option>\n      <option value=\"lte\">&le;</option>\n    </optgroup>\n\n    <optgroup label=\"Generic\">\n      <option value=\"exists\">Exists</option>\n      <option value=\"notExists\">! Exists</option>\n    </optgroup>\n  </select>\n\n  <!-- Range Fields -->\n  <input data-ng-if=\"inputNeeded()\"\n    class=\"form-control\"\n    data-ng-model=\"rule.value\"\n    type=\"number\"\n    min=\"{{ guide.minimum }}\"\n    max=\"{{ guide.maximum }}\">\n</span>\n");
 $templateCache.put("angular-elastic-builder/types/Select.html","<span class=\"select-rule\">\n  Equals to \n  <select class=\"form-control\" data-ng-model=\"rule.value\">\n      <option  data-ng-repeat=\"option in guide.options\" value=\"{{option}}\">{{option}}</option>\n  </select>\n</span>\n");
-$templateCache.put("angular-elastic-builder/types/Term.html","<span class=\"elastic-term\">\n  <select data-ng-model=\"rule.subType\" class=\"form-control\">\n\n    <!-- Matching Options -->\n    <optgroup label=\"Matching\">\n      <option value=\"match\">Minimum Should Match (%)</option>\n      <option value=\"match_phrase\">Match Phrase (slop)</option>\n      <!-- <option value=\"notMatch\">! Match</option> -->\n    </optgroup>\n\n    <!-- Term Options -->\n    <optgroup label=\"Text\">\n      <option value=\"equals\">Equals</option>\n      <option value=\"notEquals\">! Equals</option>\n    </optgroup>\n\n    <!-- Generic Options -->\n    <optgroup label=\"Generic\">\n      <option value=\"exists\">Exists</option>\n      <option value=\"notExists\">! Exists</option>\n    </optgroup>\n\n  </select>\n  <input\n    data-ng-if=\"inputNeeded() && (!guide.options.length || (guide.options.length && (rule.subType != \'notEquals\' && rule.subType != \'equals\')))\"\n    class=\"form-control\"\n    data-ng-model=\"rule.value\"\n    type=\"text\">\n\n    <select data-ng-if=\"inputNeeded() && guide.options.length && (rule.subType == \'notEquals\' || rule.subType == \'equals\')\" class=\"form-control select2\" data-ng-model=\"rule.value\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option}}\">{{option}}</option>\n    </select>\n\n    <input\n    data-ng-if=\"inputPercentNeeded()\"\n    type=\"number\" data-ng-model=\"rule.matchingPercent\"\n    class=\"form-control\" placeholder=\"Seuil de matching...\">\n\n</span>\n");}]);})(window.angular);
+$templateCache.put("angular-elastic-builder/types/Term.html","<span class=\"elastic-term\">\n\n  <select data-ng-model=\"rule.subType\" class=\"form-control\">\n\n    <!-- Matching Options -->\n    <optgroup label=\"Matching\">\n      <option value=\"match\">Minimum Should Match (%)</option>\n      <option value=\"match_phrase\">Match Phrase (slop)</option>\n      <!-- <option value=\"notMatch\">! Match</option> -->\n    </optgroup>\n\n    <!-- Term Options -->\n    <optgroup label=\"Text\">\n      <option value=\"equals\">Equals</option>\n      <!-- <option value=\"notEquals\">! Equals</option> -->\n    </optgroup>\n\n    <!-- Generic Options -->\n    <optgroup label=\"Generic\">\n      <option value=\"exists\">Exists</option>\n      <!-- <option value=\"notExists\">! Exists</option> -->\n    </optgroup>\n\n  </select>\n  <input\n    data-ng-if=\"inputNeeded() && !isSelect() && !isNested()\"\n    class=\"form-control\"\n    data-ng-model=\"rule.value\"\n    type=\"text\">\n\n\n    <select data-ng-if=\"inputNeeded() && isSelect()\" class=\"form-control select2\" data-ng-model=\"rule.value\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option}}\">{{option}}</option>\n    </select>\n\n    <select data-ng-if=\"inputNeeded() && isNested()\" ng-change=\"keyValueChanged(rule.valueKey)\" class=\"form-control select2\" data-ng-model=\"rule.valueKey\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option[guide.fieldKey]}}\">{{option[guide.fieldKey]}}</option>\n    </select>\n\n\n    <select data-ng-disabled=\"!rule.valueKey\" data-ng-if=\"inputNeeded() && isNested()\" class=\"form-control select2\" data-ng-model=\"rule.value\">\n        <option  data-ng-repeat=\"value in rule[guide.fieldValue]\" value=\"{{value}}\">{{value}}</option>\n    </select>\n\n\n\n    <input\n    data-ng-if=\"inputPercentNeeded()\"\n    type=\"number\" data-ng-model=\"rule.matchingPercent\"\n    class=\"form-control\" placeholder=\"Seuil de matching...\">\n\n</span>\n");}]);})(window.angular);
