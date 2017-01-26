@@ -638,6 +638,14 @@
       case 'match':
       case 'match_phrase':
           var fieldName = Object.keys(group[key])[0]
+          var originalFieldName = fieldName;
+          var slug_name_value = '';
+          if(~originalFieldName.indexOf('.')) {
+            var nameSplitted = originalFieldName.split('.');
+            fieldName = nameSplitted[0];
+            slug_name_value = nameSplitted[1];
+            //console.log('slug_name_value',slug_name_value);
+          }
 
           var fieldData = fieldMap.filter(function(f){
             return f.name == fieldName;
@@ -650,12 +658,13 @@
           if(obj.field.options && obj.field.options.length){
 
             if(obj.field.object){
+
+
               var fieldKey = obj.field.fieldKey || 'name';
               var fieldValue = obj.field.fieldValue || 'value';
               var fieldKeyPath = fieldName + '.' + fieldKey;
               var fieldValuePath = fieldName + '.' + fieldValue;
-              obj.valueKey = group[key][fieldKeyPath];
-              obj.value = group[key][fieldValuePath];
+              obj.valueKey = slug_name_value;
               obj.subType = key;//'equals';
               obj.field.options.forEach(function(o){
                 if(o.name ==  obj.valueKey) {
@@ -663,29 +672,11 @@
                 }
               });
 
-              //search value key
-              if(!obj.valueKey && obj.value){
-                var valueKey = '';
-                  obj.field.options.forEach(function(o){
-
-                    o[fieldValue].forEach(function(v){
-                      if(v == obj.value) {
-                        obj.valueKey = o[fieldKey];
-                        obj[fieldValue] = o[fieldValue];
-                        return;
-                      }
-                      return;
-                    });
-                    if(obj.valueKey) return;
-
-                    });
-              }
-
             }
 
-             obj.matchingPercent = parseInt(group[key][fieldName].minimum_should_match.slice(0, -1));
-             obj.operator = group[key][fieldName].operator;
-             console.log('group[key]',group[key]);
+
+             obj.matchingPercent = parseInt(group[key][originalFieldName].minimum_should_match.slice(0, -1));
+             obj.operator = group[key][originalFieldName].operator;
 
           }
           else{
@@ -693,8 +684,9 @@
                  obj.value = group[key][fieldName].slop;
              }
              else{
-               obj.matchingPercent = parseInt(group[key][fieldName].minimum_should_match.slice(0, -1));
-               obj.operator = group[key][fieldName].operator;
+
+               obj.matchingPercent = parseInt(group[key][originalFieldName].minimum_should_match.slice(0, -1));
+               obj.operator = group[key][originalFieldName].operator;
              }
 
              obj.subType = key;
