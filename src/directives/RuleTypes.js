@@ -36,6 +36,9 @@
           scope.isSelect = function(){
             return !scope.guide.nested && scope.guide.options.length && (scope.rule.subType == 'notEquals' || scope.rule.subType == 'equals');
           }
+          scope.isObject = function(){
+            return scope.guide.object && scope.guide.options.length;
+          }
 
           scope.isNested = function(){
             return scope.guide.nested && scope.guide.options.length && (scope.rule.subType == 'notEquals' || scope.rule.subType == 'equals');
@@ -71,7 +74,7 @@
               'lte',
             ];
 
-            return ~needs.indexOf(scope.rule.subType);
+            return ~needs.indexOf(scope.rule.subType) || (scope.rule.subType === 'match' && scope.guide.object);
           };
 
           scope.inputPercentNeeded = function() {

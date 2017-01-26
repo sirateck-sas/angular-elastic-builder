@@ -184,17 +184,64 @@
             return f.name == fieldName;
           });
 
+
           if(!fieldData.length) {console.log("No fieldData",fieldMap);return {};}
           obj.field = fieldData[0];
 
-         if(key != 'match'){
-              obj.value = group[key][fieldName].slop;
+          if(obj.field.options && obj.field.options.length){
+
+            if(obj.field.object){
+              var fieldKey = obj.field.fieldKey || 'name';
+              var fieldValue = obj.field.fieldValue || 'value';
+              var fieldKeyPath = fieldName + '.' + fieldKey;
+              var fieldValuePath = fieldName + '.' + fieldValue;
+              obj.valueKey = group[key][fieldKeyPath];
+              obj.value = group[key][fieldValuePath];
+              obj.subType = key;//'equals';
+              obj.field.options.forEach(function(o){
+                if(o.name ==  obj.valueKey) {
+                  obj[fieldValue] = o[fieldValue];
+                }
+              });
+
+              //search value key
+              if(!obj.valueKey && obj.value){
+                var valueKey = '';
+                  obj.field.options.forEach(function(o){
+
+                    o[fieldValue].forEach(function(v){
+                      if(v == obj.value) {
+                        obj.valueKey = o[fieldKey];
+                        obj[fieldValue] = o[fieldValue];
+                        return;
+                      }
+                      return;
+                    });
+                    if(obj.valueKey) return;
+
+                    });
+              }
+
+            }
+
+             obj.matchingPercent = parseInt(group[key][fieldName].minimum_should_match.slice(0, -1));
+             obj.operator = group[key][fieldName].operator;
+             
+
           }
           else{
-            obj.matchingPercent = parseInt(group[key][fieldName].minimum_should_match.slice(0, -1));
+            if(key != 'match'){
+                 obj.value = group[key][fieldName].slop;
+             }
+             else{
+               obj.matchingPercent = parseInt(group[key][fieldName].minimum_should_match.slice(0, -1));
+               obj.operator = group[key][fieldName].operator;
+             }
+
+             obj.subType = key;
           }
 
-          obj.subType = key;
+
 
         break;
       case 'term':
@@ -426,11 +473,35 @@
 
             if (group.matchingPercent === undefined) return;
             obj = { match:{}};
-            obj.match[fieldName] = {}
-            obj.match[fieldName]['query'] = "%" + fieldName + "%"; //used for template engine
+            if(fieldData.object){
+              obj.match = {};
 
-            obj.match[fieldName]['minimum_should_match'] = group.matchingPercent + "%";
-            obj.match[fieldName]['operator'] = 'and';
+             //var nestedPath = fieldData.nestedPath || fieldName;
+              var fieldKey = fieldData.fieldKey || 'name';
+              var fieldValue = fieldData.fieldValue || 'value';
+              var fieldKeyPath = fieldName + '.' + fieldKey;
+              var fieldValuePath = fieldName + '.' + fieldValue
+              if(group.value)
+              {
+                obj.match[fieldValuePath]  = group.value;
+              }
+              else{
+                var newFieldName = fieldName + '.' + group.valueKey + '.' + fieldValue;
+                obj.match[newFieldName] = {}
+                obj.match[newFieldName]['query'] = "%" + newFieldName + "%"; //used for template engine
+                obj.match[newFieldName]['minimum_should_match'] = group.matchingPercent + "%";
+                obj.match[newFieldName]['operator'] = group.operator;
+              }
+
+
+            }
+            else{
+              obj.match[fieldName] = {}
+              obj.match[fieldName]['query'] = "%" + fieldName + "%"; //used for template engine
+              obj.match[fieldName]['minimum_should_match'] = group.matchingPercent + "%";
+              obj.match[fieldName]['operator'] = group.operator;
+            }
+
 
             break;
           case "match_phrase":
