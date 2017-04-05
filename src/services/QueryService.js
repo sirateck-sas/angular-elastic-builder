@@ -136,6 +136,12 @@
       , type = typeMap[key] || 'item'
       , obj = getFilterTemplate(type);
 
+      //Little hack to process match key as term
+      var fieldNameTmp = Object.keys(group[key])[0];
+      if(key === 'match' && !group[key][fieldNameTmp].minimum_should_match){
+        key = 'term';
+      }
+
     switch (key) {
       case 'bool':
           //Transform fo array
@@ -235,6 +241,9 @@
         break;
       case 'term':
       case 'terms':
+
+      //little hack :-(
+      if(!group[key]) key = 'match';
 
 
         var originalFieldName = Object.keys(group[key])[0];
@@ -423,7 +432,7 @@
 
 
             if(fieldData.nested){
-              obj.term = {};
+              obj.match = {};
 
              //var nestedPath = fieldData.nestedPath || fieldName;
               var fieldKey = fieldData.fieldKey || 'name';
@@ -432,17 +441,17 @@
               var fieldValuePath = fieldName + '.' + fieldValue
               if(group.value)
               {
-                obj.term[fieldValuePath]  = group.value;
+                obj.match[fieldValuePath]  = group.value;
               }
               else{
-                obj.term[fieldKeyPath]  = group.valueKey;
+                obj.match[fieldKeyPath]  = group.valueKey;
               }
 
 
             }
             else{
-              obj.term = {};
-              obj.term[fieldName] = group.value;
+              obj.match = {};
+              obj.match[fieldName] = group.value;
             }
 
             break;
