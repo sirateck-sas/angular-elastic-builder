@@ -669,7 +669,6 @@
               var fieldKeyPath = fieldName + '.' + fieldKey;
               var fieldValuePath = fieldName + '.' + fieldValue;
               obj.valueKey = slug_name_value;
-              obj.subType = key;//'equals';
               obj.field.options.forEach(function(o){
                 if(o.name ==  obj.valueKey) {
                   obj[fieldValue] = o[fieldValue];
@@ -677,7 +676,7 @@
               });
 
             }
-
+             obj.subType = key;//'equals';
              obj.matchingPercent = parseInt(group[key][originalFieldName].minimum_should_match.slice(0, -1));
              obj.operator = group[key][originalFieldName].operator;
 
