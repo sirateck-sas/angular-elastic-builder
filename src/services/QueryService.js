@@ -405,6 +405,7 @@
     var field = group.field;
     var fieldData = fieldMap.find(function(elmt){
       if(typeof field == "object") {
+        if(!elmt.options) elmt.options = [];
         return angular.equals(elmt,field);
       }
       else{
