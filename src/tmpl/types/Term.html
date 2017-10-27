@@ -30,7 +30,7 @@
 
 
     <select data-ng-if="inputNeeded() && isSelect()" class="form-control select2" data-ng-model="rule.value">
-        <option  data-ng-repeat="option in guide.options" value="{{option}}">{{option}}</option>
+        <option  data-ng-repeat="option in guide.options" value="{{option.value || option}}">{{option.name || option}}</option>
     </select>
 
     <select data-ng-if="inputNeeded() && isObject()" class="form-control select2" data-ng-model="rule.valueKey">
