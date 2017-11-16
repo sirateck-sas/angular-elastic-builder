@@ -305,8 +305,14 @@
 
           }
           else{
-              obj.value = group[key][fieldName];
+              if(typeof  group[key][fieldName] === 'object'){
+                obj.value = group[key][fieldName].query;
+              }
+              else{
+                obj.value = group[key][fieldName];
+              }
               obj.subType = 'equals';
+
           }
 
         }
@@ -451,7 +457,10 @@
             }
             else{
               obj.match = {};
-              obj.match[fieldName] = group.value;
+              obj.match[fieldName] = {};
+              obj.match[fieldName].query = group.value; //used for template engine
+              obj.match[fieldName].operator = 'and';
+
             }
 
             break;
