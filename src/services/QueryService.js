@@ -247,8 +247,11 @@
 
         var originalFieldName = Object.keys(group[key])[0];
         var fieldName = originalFieldName;
+        var slug_name_value = '';
         if(~originalFieldName.indexOf('.')) {
-          fieldName = fieldName.split('.')[0];
+          var nameSplitted = originalFieldName.split('.');
+          fieldName = nameSplitted[0];
+          slug_name_value = nameSplitted[1];
         }
 
         var fieldData = fieldMap.filter(function(f){
@@ -271,13 +274,14 @@
         }
         else if(obj.field.options && obj.field.options.length){
 
-          if(obj.field.nested){
+          if(obj.field.nested || obj.field.object){
             var fieldKey = obj.field.fieldKey || 'name';
             var fieldValue = obj.field.fieldValue || 'value';
             var fieldKeyPath = fieldName + '.' + fieldKey;
             var fieldValuePath = fieldName + '.' + fieldValue;
             obj.valueKey = group[key][fieldKeyPath];
-            obj.value = group[key][fieldValuePath];
+            if (slug_name_value) obj.valueKey = slug_name_value;
+            if (obj.field.nested) obj.value = group[key][fieldValuePath];
             obj.subType = 'equals';
             obj.field.options.forEach(function(o){
               if(o.name ==  obj.valueKey) {
@@ -437,7 +441,7 @@
             if (!fieldData.nested && !group.value === undefined) return;
 
 
-            if(fieldData.nested){
+            if(fieldData.nested || fieldData.object){
               obj.match = {};
 
              //var nestedPath = fieldData.nestedPath || fieldName;
@@ -445,12 +449,19 @@
               var fieldValue = fieldData.fieldValue || 'value';
               var fieldKeyPath = fieldName + '.' + fieldKey;
               var fieldValuePath = fieldName + '.' + fieldValue
-              if(group.value)
+
+              if(group.value && !fieldData.object)
               {
                 obj.match[fieldValuePath]  = group.value;
               }
               else{
-                obj.match[fieldKeyPath]  = group.valueKey;
+                // obj.match[fieldKeyPath]  = group.valueKey;
+                var newFieldName = fieldName + '.' + group.valueKey + '.' + fieldValue;
+                obj.match[newFieldName] = {}
+                obj.match[newFieldName]['query'] = group.value; //used for template engine
+                obj.match[newFieldName]['minimum_should_match'] = '100%';
+                obj.match[newFieldName]['operator'] = 'and';
+
               }
 
 
@@ -488,6 +499,7 @@
               var fieldValue = fieldData.fieldValue || 'value';
               var fieldKeyPath = fieldName + '.' + fieldKey;
               var fieldValuePath = fieldName + '.' + fieldValue
+
               if(group.value)
               {
                 obj.match[fieldValuePath]  = group.value;

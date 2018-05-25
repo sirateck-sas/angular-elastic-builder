@@ -706,8 +706,11 @@
 
         var originalFieldName = Object.keys(group[key])[0];
         var fieldName = originalFieldName;
+        var slug_name_value = '';
         if(~originalFieldName.indexOf('.')) {
-          fieldName = fieldName.split('.')[0];
+          var nameSplitted = originalFieldName.split('.');
+          fieldName = nameSplitted[0];
+          slug_name_value = nameSplitted[1];
         }
 
         var fieldData = fieldMap.filter(function(f){
@@ -730,13 +733,14 @@
         }
         else if(obj.field.options && obj.field.options.length){
 
-          if(obj.field.nested){
+          if(obj.field.nested || obj.field.object){
             var fieldKey = obj.field.fieldKey || 'name';
             var fieldValue = obj.field.fieldValue || 'value';
             var fieldKeyPath = fieldName + '.' + fieldKey;
             var fieldValuePath = fieldName + '.' + fieldValue;
             obj.valueKey = group[key][fieldKeyPath];
-            obj.value = group[key][fieldValuePath];
+            if (slug_name_value) obj.valueKey = slug_name_value;
+            if (obj.field.nested) obj.value = group[key][fieldValuePath];
             obj.subType = 'equals';
             obj.field.options.forEach(function(o){
               if(o.name ==  obj.valueKey) {
@@ -896,7 +900,7 @@
             if (!fieldData.nested && !group.value === undefined) return;
 
 
-            if(fieldData.nested){
+            if(fieldData.nested || fieldData.object){
               obj.match = {};
 
              //var nestedPath = fieldData.nestedPath || fieldName;
@@ -904,12 +908,19 @@
               var fieldValue = fieldData.fieldValue || 'value';
               var fieldKeyPath = fieldName + '.' + fieldKey;
               var fieldValuePath = fieldName + '.' + fieldValue
-              if(group.value)
+
+              if(group.value && !fieldData.object)
               {
                 obj.match[fieldValuePath]  = group.value;
               }
               else{
-                obj.match[fieldKeyPath]  = group.valueKey;
+                // obj.match[fieldKeyPath]  = group.valueKey;
+                var newFieldName = fieldName + '.' + group.valueKey + '.' + fieldValue;
+                obj.match[newFieldName] = {}
+                obj.match[newFieldName]['query'] = group.value; //used for template engine
+                obj.match[newFieldName]['minimum_should_match'] = '100%';
+                obj.match[newFieldName]['operator'] = 'and';
+
               }
 
 
@@ -947,6 +958,7 @@
               var fieldValue = fieldData.fieldValue || 'value';
               var fieldKeyPath = fieldName + '.' + fieldKey;
               var fieldValuePath = fieldName + '.' + fieldValue
+
               if(group.value)
               {
                 obj.match[fieldValuePath]  = group.value;
@@ -1093,4 +1105,4 @@ $templateCache.put("angular-elastic-builder/types/Date.html","<span class=\"date
 $templateCache.put("angular-elastic-builder/types/Multi.html","<span class=\"multi-rule\">\n  <span data-ng-repeat=\"choice in guide.choices\">\n    <label class=\"checkbox\">\n      <input type=\"checkbox\" data-ng-model=\"rule.values[choice]\">\n      {{ choice }}\n    </label>\n  </span>\n</span>\n");
 $templateCache.put("angular-elastic-builder/types/Number.html","<span class=\"number-rule\">\n  <select data-ng-model=\"rule.subType\" class=\"form-control\">\n    <optgroup label=\"Numeral\">\n      <option value=\"equals\">=</option>\n      <option value=\"gt\">&gt;</option>\n      <option value=\"gte\">&ge;</option>\n      <option value=\"lt\">&lt;</option>\n      <option value=\"lte\">&le;</option>\n    </optgroup>\n\n    <optgroup label=\"Generic\">\n      <option value=\"exists\">Exists</option>\n      <option value=\"notExists\">! Exists</option>\n    </optgroup>\n  </select>\n\n  <!-- Range Fields -->\n  <input data-ng-if=\"inputNeeded()\"\n    class=\"form-control\"\n    data-ng-model=\"rule.value\"\n    type=\"number\"\n    min=\"{{ guide.minimum }}\"\n    max=\"{{ guide.maximum }}\">\n</span>\n");
 $templateCache.put("angular-elastic-builder/types/Select.html","<span class=\"select-rule\">\n  Equals to\n  <select class=\"form-control\" data-ng-model=\"rule.value\">\n      <option  data-ng-repeat=\"option in guide.options\" value=\"{{option.value || option}}\">{{option.name || option}}</option>\n  </select>\n</span>\n");
-$templateCache.put("angular-elastic-builder/types/Term.html","<span class=\"elastic-term\">\n\n  <select data-ng-model=\"rule.subType\" class=\"form-control\">\n\n    <!-- Matching Options -->\n    <optgroup label=\"Matching\">\n      <option value=\"match\">Minimum Should Match (%)</option>\n      <option value=\"match_phrase\">Match Phrase (slop)</option>\n      <!-- <option value=\"notMatch\">! Match</option> -->\n    </optgroup>\n\n    <!-- Term Options -->\n    <optgroup label=\"Text\">\n      <option value=\"equals\">Equals</option>\n      <!-- <option value=\"notEquals\">! Equals</option> -->\n    </optgroup>\n\n    <!-- Generic Options -->\n    <optgroup label=\"Generic\">\n      <option value=\"exists\">Exists</option>\n      <!-- <option value=\"notExists\">! Exists</option> -->\n    </optgroup>\n\n  </select>\n  <input\n    data-ng-if=\"inputNeeded() && !isSelect() && !isNested() && !isObject()\"\n    class=\"form-control\"\n    data-ng-model=\"rule.value\"\n    type=\"text\">\n\n\n    <select data-ng-if=\"inputNeeded() && isSelect()\" class=\"form-control select2\" data-ng-model=\"rule.value\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option.value || option}}\">{{option.name || option}}</option>\n    </select>\n\n    <select data-ng-if=\"inputNeeded() && isObject()\" class=\"form-control select2\" data-ng-model=\"rule.valueKey\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option[guide.fieldKey]}}\">{{option[guide.fieldKey]}}</option>\n    </select>\n\n    <select data-ng-if=\"inputNeeded() && isNested()\" ng-change=\"keyValueChanged(rule.valueKey)\" class=\"form-control select2\" data-ng-model=\"rule.valueKey\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option[guide.fieldKey]}}\">{{option[guide.fieldKey]}}</option>\n    </select>\n\n\n    <select data-ng-disabled=\"!rule.valueKey\" data-ng-if=\"inputNeeded() && isNested()\" class=\"form-control select2\" data-ng-model=\"rule.value\">\n        <option  data-ng-repeat=\"value in rule[guide.fieldValue]\" value=\"{{value}}\">{{value}}</option>\n    </select>\n\n\n\n    <input\n    data-ng-if=\"inputPercentNeeded()\"\n    type=\"number\" data-ng-model=\"rule.matchingPercent\"\n    class=\"form-control\" placeholder=\"Seuil de matching...\">\n\n    <select\n    data-ng-if=\"inputPercentNeeded()\"\n    data-ng-model=\"rule.operator\"\n    class=\"form-control select2\">\n    <option value=\"or\">OR</option>\n    <option value=\"and\">AND</option>\n    </select>\n\n</span>\n");}]);})(window.angular);
+$templateCache.put("angular-elastic-builder/types/Term.html","<span class=\"elastic-term\">\n\n  <select data-ng-model=\"rule.subType\" class=\"form-control\">\n\n    <!-- Matching Options -->\n    <optgroup label=\"Matching\">\n      <option value=\"match\">Minimum Should Match (%)</option>\n      <option value=\"match_phrase\">Match Phrase (slop)</option>\n      <!-- <option value=\"notMatch\">! Match</option> -->\n    </optgroup>\n\n    <!-- Term Options -->\n    <optgroup label=\"Text\">\n      <option value=\"equals\">Equals</option>\n      <!-- <option value=\"notEquals\">! Equals</option> -->\n    </optgroup>\n\n    <!-- Generic Options -->\n    <optgroup label=\"Generic\">\n      <option value=\"exists\">Exists</option>\n      <!-- <option value=\"notExists\">! Exists</option> -->\n    </optgroup>\n\n  </select>\n  <input\n    data-ng-if=\"inputNeeded() && !isSelect() && !isNested() && !isObject()\"\n    class=\"form-control\"\n    data-ng-model=\"rule.value\"\n    type=\"text\">\n\n\n    <select data-ng-if=\"inputNeeded() && isSelect() && !isObject()\" class=\"form-control select2\" data-ng-model=\"rule.value\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option.value || option}}\">{{option.name || option}}</option>\n    </select>\n\n    <select data-ng-if=\"inputNeeded() && isSelect() && isObject() && !inputPercentNeeded()\" ng-change=\"keyValueChanged(rule.valueKey)\" class=\"form-control select2\" data-ng-model=\"rule.valueKey\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option[guide.fieldKey]}}\">{{option[guide.fieldKey]}}</option>\n    </select>\n\n    <select data-ng-if=\"inputNeeded() && isObject() && !inputPercentNeeded()\" class=\"form-control select2\" data-ng-model=\"rule.value\">\n        <option  data-ng-repeat=\"option in rule[guide.fieldValue]\"  value=\"{{option}}\">{{option}}</option>\n    </select>\n\n    <select data-ng-if=\"inputNeeded() && isNested()\" ng-change=\"keyValueChanged(rule.valueKey)\" class=\"form-control select2\" data-ng-model=\"rule.valueKey\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option[guide.fieldKey]}}\">{{option[guide.fieldKey]}}</option>\n    </select>\n\n\n    <select data-ng-disabled=\"!rule.valueKey\" data-ng-if=\"inputNeeded() && isNested()\" class=\"form-control select2\" data-ng-model=\"rule.value\">\n        <option  data-ng-repeat=\"value in rule[guide.fieldValue]\" value=\"{{value}}\">{{value}}</option>\n    </select>\n\n    <select data-ng-if=\"inputNeeded() && isObject() && inputPercentNeeded()\" class=\"form-control select2\" data-ng-model=\"rule.valueKey\">\n        <option  data-ng-repeat=\"option in guide.options\" value=\"{{option[guide.fieldKey]}}\">{{option[guide.fieldKey]}}</option>\n    </select>\n\n    <input\n    data-ng-if=\"inputPercentNeeded()\"\n    type=\"number\" data-ng-model=\"rule.matchingPercent\"\n    class=\"form-control\" placeholder=\"Seuil de matching...\">\n\n    <select\n    data-ng-if=\"inputPercentNeeded()\"\n    data-ng-model=\"rule.operator\"\n    class=\"form-control select2\">\n    <option value=\"or\">OR</option>\n    <option value=\"and\">AND</option>\n    </select>\n\n</span>\n");}]);})(window.angular);

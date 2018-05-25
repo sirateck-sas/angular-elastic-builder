@@ -29,12 +29,16 @@
     type="text">
 
 
-    <select data-ng-if="inputNeeded() && isSelect()" class="form-control select2" data-ng-model="rule.value">
+    <select data-ng-if="inputNeeded() && isSelect() && !isObject()" class="form-control select2" data-ng-model="rule.value">
         <option  data-ng-repeat="option in guide.options" value="{{option.value || option}}">{{option.name || option}}</option>
     </select>
 
-    <select data-ng-if="inputNeeded() && isObject()" class="form-control select2" data-ng-model="rule.valueKey">
+    <select data-ng-if="inputNeeded() && isSelect() && isObject() && !inputPercentNeeded()" ng-change="keyValueChanged(rule.valueKey)" class="form-control select2" data-ng-model="rule.valueKey">
         <option  data-ng-repeat="option in guide.options" value="{{option[guide.fieldKey]}}">{{option[guide.fieldKey]}}</option>
+    </select>
+
+    <select data-ng-if="inputNeeded() && isObject() && !inputPercentNeeded()" class="form-control select2" data-ng-model="rule.value">
+        <option  data-ng-repeat="option in rule[guide.fieldValue]"  value="{{option}}">{{option}}</option>
     </select>
 
     <select data-ng-if="inputNeeded() && isNested()" ng-change="keyValueChanged(rule.valueKey)" class="form-control select2" data-ng-model="rule.valueKey">
@@ -46,7 +50,9 @@
         <option  data-ng-repeat="value in rule[guide.fieldValue]" value="{{value}}">{{value}}</option>
     </select>
 
-
+    <select data-ng-if="inputNeeded() && isObject() && inputPercentNeeded()" class="form-control select2" data-ng-model="rule.valueKey">
+        <option  data-ng-repeat="option in guide.options" value="{{option[guide.fieldKey]}}">{{option[guide.fieldKey]}}</option>
+    </select>
 
     <input
     data-ng-if="inputPercentNeeded()"
