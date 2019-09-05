@@ -4,6 +4,7 @@
   "description": "Angular Module for building an Elasticsearch Query",
   "author": "Dan Crews <crewsd@gmail.com>",
   "license": "MIT",
+  "main": "index.js",
   "keywords": [
     "angular",
     "elasticsearch"
